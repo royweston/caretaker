@@ -6,7 +6,7 @@
  * Licenced under the MIT licence.
  * http://royweston.me.uk/web-development/caretaker-javascript-library/licence
  *
- * Date: 2009-09-21
+ * Date: 2009-09-30
  */
 var ct = {
   config: {},
@@ -35,9 +35,14 @@ var ct = {
       if (!ct.config) {ct.config = {}};
       if (!ct.config.cssResources){ct.config.cssResources = []};
       ct.config.cssResources.push({url: rs, onload: onload});
+    },
+
+    setSameOriginDomain: function(domain) {
+      if (!ct.config) {ct.config = {}};
+      ct.config.sameOriginDomain = domain;
     }
   },
-
+  
   kernel: {
     setPath: function(path){
       if (!ct.config) {ct.config = {}};

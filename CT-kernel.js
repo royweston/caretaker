@@ -6,7 +6,7 @@
  * Licenced under the MIT licence.
  * http://royweston.me.uk/web-development/caretaker-javascript-library/licence
  *
- * Date: 2009-09-21
+ * Date: 2009-09-30
  */
 if (!window.Node) {
   var Node = {
@@ -131,7 +131,7 @@ ct.resource = function(){
   var load = function(){
     var queuedResources = [];
     
-    // Sets the same-origin policy domain to the least restrictive domain name:
+    // Relaxes the same-origin policy domain to the least restrictive domain name:
     // ccTLDs - a.b.co.uk becomes b.co.uk
     //        - a.co.uk remains a.co.uk
     // TLDs - a.b.example.com becomes example.com
@@ -147,6 +147,14 @@ ct.resource = function(){
       }
       
       try {
+        // If the sameOriginDomain has been set to override the automated
+        // relaxation of the the same-origin policy domain, then it should
+        // be used.
+        if (ct.config.sameOriginDomain) {
+          document.domain = ct.config.sameOriginDomain;
+          return;
+        }
+        
         var idx = cDomain.lastIndexOf('.');
         if (-1 === idx) {
           return;
@@ -161,27 +169,23 @@ ct.resource = function(){
         if (localhost) {
           return; // nothing more to do
         }
-        else 
-          if (ccTLD) {
-            re = new RegExp('(\\.|^)(' + re_validDomainName + ')\\.([a-z]{2,})\\.([a-z]{2})$');
-          }
-          else 
-            if (local) {
-              re = new RegExp('(\\.|^)(' + re_validDomainName + ')\\.local$');
-            }
-            else 
-              if (gTLD) {
-                re = new RegExp('(\\.|^)(' + re_validDomainName + ')\\.([a-z]{3,})$');
-              }
+        else if (ccTLD) {
+          re = new RegExp('(\\.|^)(' + re_validDomainName + ')\\.([a-z]{2,})\\.([a-z]{2})$');
+        }
+        else if (local) {
+          re = new RegExp('(\\.|^)(' + re_validDomainName + ')\\.local$');
+        }
+        else if (gTLD) {
+          re = new RegExp('(\\.|^)(' + re_validDomainName + ')\\.([a-z]{3,})$');
+        }
+        else {
+          return;
+        }
         
         var domainElms = cDomain.match(re);
-        if (!domainElms) {
-          return;
-        }; // nothing more to do
+        if (!domainElms) { return; }; // nothing more to do
         domainElms.splice(0, 2);
-        if (local) {
-          domainElms.push('local');
-        }
+        if (local) { domainElms.push('local'); }
         nDomain = domainElms.join('.');
         document.domain = nDomain;
       } catch (e) {
@@ -195,7 +199,7 @@ ct.resource = function(){
       while (i > -1) {
         var qResource = queuedResources[i];
         if (qResource.type === type && qResource.url === url) {
-          // Add group id to the resource as this group is dependent
+          // Add this group id to the resource as this group is dependent
           // upon this resource being loaded.
           if (!qResource.groupId) {
             qResource.groupId = [groupId];
@@ -231,6 +235,8 @@ ct.resource = function(){
         while (i > -1) {
           var script = scripts[i];
           if (script.url === url || script.src === url) { 
+            // Add script to queued resources so that any scripts that are
+            // marked as having dependencies on this script will be run.
             var iQueue = queuedResources.length;
             var qResource = {
               type: type,
@@ -253,18 +259,32 @@ ct.resource = function(){
     
     function manageDependencies(){
       var len = queuedResources.length;
-      // GroupId 0 first item is always 'loaded' (even if it's not).
-      // This means we don't have to keep checking for groupId 0 and
-      // then doing something different.
+      // GroupId 0's first resource is always 'loaded' (even if it's not).
+      // This means we can use the same algorithm for grouped and non-grouped
+      // resources.
       var firstGroupResourceLoaded = [true];
-      // ignoreRestOfGroup is used to manage dependencies within a group.
+      // ignoreRestOfGroup is used to manage dependencies within a group. If
+      // a resource has a dependency on earlier group resources that have yet
+      // to be loaded, then the dependent resource cannot be loaded yet.
       var ignoreRestOfGroup = [];
       
       // Iterate through all the resources. Manage dependencies in grouped
       // resources.
       for (var i = 0; i < len; i++) {
         var qResource = queuedResources[i];
-        var useGroupId = (1 === qResource.groupId.length) ? qResource.groupId[0]: 0;
+        
+        // A resource that is used in more than one group _must_ initially
+        // be loaded outside of the groups, i.e. as group 0, so check group
+        // 0. If it's only used in one group, then check that group. 
+        var useGroupId = (1 === qResource.groupId.length) ? qResource.groupId[0] : 0;
+        
+        // If the first resource of this group has not been loaded, there's no
+        // sense in further processing this group as all the other resources in
+        // this group are inherently dependent upon it.
+        // If the first resource of this group has been loaded, then check if
+        // this resource dependent upon other resources of this group having
+        // been loaded. If it is and the other resources have been loaded, then
+        // further process this resource, otherwise skip it. 
         if (   !firstGroupResourceLoaded[useGroupId] 
             || (   firstGroupResourceLoaded[qResource.groupId]
                 && ignoreRestOfGroup[useGroupId]
@@ -273,7 +293,8 @@ ct.resource = function(){
             ) { continue; }
 
         var resourceComplete = ('complete' === qResource.status);
-        // Determine if this is the first file of a group, and if it is
+
+        // Determine if this is the first resource of a group, and if it is
         // and it is 'complete' then mark this group's initial dependency
         // as being fulfilled.
         var ignoreGroup = false;
@@ -290,25 +311,25 @@ ct.resource = function(){
         }
         // A group must always have a dependency on a resource from the
         // default groupId 0. Therefore if the groupId array length is
-        // greater than 1, this resource contains an item from groupId 0
-        // and must not be ignored.
+        // greater than 1, this resource is dependent upon an item from
+        // groupId 0 and must not be ignored.
         if (ignoreGroup && !belongsToGroupIdZero) { continue; }
         
         if (!resourceComplete) {
           if (!qResource.response) {
             // Need to wait for the request response to have completed
-            // before processing this process further.
+            // before processing this resource further.
             continue;
           }
           else {
             // The only domElm items in this queue should be scripts that are sourced from
-            // a none same-origin domain and have dependencies on prior scripts.
+            // a none same-origin domain and have dependencies on prior resources.
             // Therefore the only domElm items should be ones queued to be downloaded. These
             // none same-origin domain scripts with dependencies are downloaded consecutively.
             // domElm items fire their own onload functions as soon as they are downloaded. 
             if ('domElm' === qResource.loadMethod && 'pending' === qResource.status) {
               domElement(qResource.type, qResource.url, qResource.onload, false, null, i);              
-              // STOP! need to wait for this response
+              // Waiting for a response.
               continue;
             }
             else if ('xhr' === qResource.loadMethod) {
@@ -492,7 +513,7 @@ ct.resource = function(){
         
         if (alreadyLoaded(type, rs.url, iResourceGroup)) { continue; }
         
-        // Resources not complying to the same-origin domain policy must
+        // Resources not complying to the same-origin policy domain must
         // be loaded via dom script elements. Otherwise use XHR. Using
         // XHR has the advantage that they can be downloaded in parallel
         // even where there are prior dependencies that need to be meet.
