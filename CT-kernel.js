@@ -6,7 +6,7 @@
  * Licenced under the MIT licence.
  * http://royweston.me.uk/web-development/caretaker-javascript-library/licence
  *
- * Date: 2009-09-30
+ * Date: 2009-10-15
  */
 if (!window.Node) {
   var Node = {
@@ -94,7 +94,7 @@ ct.resource = function(){
         function() {
           req.abort();
           req.onreadystatechange = null;
-          alert('Request aborted: '+ url);
+          (!ct.config.kernel_debug) ? null : alert('Request aborted: '+ url);
         }
       , TIMEOUT
       );
@@ -362,7 +362,7 @@ ct.resource = function(){
     
     function xhrInjectionOnload(rs){
       setTimeout(function() {
-          (new Function(rs.onload))();
+          rs.onload();
           rs.status = 'complete';
           manageDependencies();
         }
@@ -419,7 +419,7 @@ ct.resource = function(){
       elm.onload = function(){
         elm.onloadDone = true;
         queuedResources[iQueue].response = 'DOM Element loaded';
-        if (onload) {(new Function(onload))();}
+        if (onload) {onload();}
         queuedResources[iQueue].status = 'complete';
         manageDependencies();
       };
@@ -473,7 +473,7 @@ ct.resource = function(){
             if (qResource.onload) {
               setTimeout(
                 function(){
-                  (new Function(qResource.onload))();
+                  qResource.onload();
                   queuedResources[iQueue].status = 'complete';
                   manageDependencies();
                 }, 0
