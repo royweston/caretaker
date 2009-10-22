@@ -6,61 +6,98 @@
  * Licenced under the MIT licence.
  * http://royweston.me.uk/web-development/caretaker-javascript-library/licence
  *
- * Date: 2009-09-30
+ * Date: 2009-10-22
  */
-var ct = {
-  config: {},
+var ct = function(){
+  var userCfg = {};
+  var kernelPath = '';
+  var kernelId = '';
+  var debugMode = false;
+  var rsJs = [];
+  var rsCss = [];
+  var soDomain;
 
-  boot: function(){
-    if (!ct.config.kernel_id){ct.config.kernel_id = ''};
+  var bootCfg = function(){
+    function reqJs(){
+      return rsJs;
+    }
+
+    function reqCss(){
+      return rsCss;
+    }
+
+    function getDmn(){
+      return soDomain;
+    }
+
+    return {
+      jsResources: reqJs,
+      cssResources: reqCss,
+      getSameOriginDomain: getDmn
+    }
+  }();
+
+  function boot(){
     var script = document.createElement('script');
     script.type = 'text/javascript';
-    script.src =
-      (!ct.config.kernel_path ? '' : ct.config.kernel_path)+
-      'CT-kernel'+
-      (!ct.config.kernel_debug ? '-min' : '')+
-      (!ct.config.kernel_id ? '' : ct.config.kernel_id)+
-      '.js';
+    script.src = kernelPath + 'CT-kernel' +
+      (!debugMode ? '-min' : '') + kernelId + '.js';
     document.getElementsByTagName('head')[0].appendChild(script);
-  },
-
-  resource: {
-    loadJS: function(rs, onload, hasDependencies, groupName){
-      if (!ct.config) {ct.config = {}};
-      if (!ct.config.jsResources){ct.config.jsResources = []};
-      ct.config.jsResources.push({url: rs, onload: onload, dependencies: hasDependencies, group: groupName});
-    },
-    
-    loadCSS: function(rs, onload){
-      if (!ct.config) {ct.config = {}};
-      if (!ct.config.cssResources){ct.config.cssResources = []};
-      ct.config.cssResources.push({url: rs, onload: onload});
-    },
-
-    setSameOriginDomain: function(domain) {
-      if (!ct.config) {ct.config = {}};
-      ct.config.sameOriginDomain = domain;
-    }
-  },
-  
-  kernel: {
-    setPath: function(path){
-      if (!ct.config) {ct.config = {}};
-      ct.config.kernel_path = path;
-    },
-    
-    setVersionId: function(id){
-      if (!ct.config) {ct.config = {}};
-      ct.config.kernel_id = id;
-    },
-    
-    debug: function(){
-      if (!ct.config) {ct.config = {}};
-      ct.config.kernel_debug = true;
-    }
   }
 
-};
+  var resource = function(){
+    function loadJS(rs, onload, hasDependencies, groupName){
+      rsJs[rsJs.length] = {url: rs, onload: onload, dependencies: hasDependencies, group: groupName};
+    }
+
+    function loadCSS(rs, onload){
+      rsCss[rsCss.length] = {url: rs, onload: onload};
+    }
+
+    function setDmn(domain) {
+      bootCfg.soDomain = domain;
+    }
+
+    return {
+      loadJS: loadJS,
+      loadCSS: loadCSS,
+      setSameOriginDomain: setDmn
+    }
+  }();
+
+  var kernel = function(){
+    function path(path){
+      kernelPath = path;
+    }
+
+    function versionId(id){
+      kernelId = id;
+    }
+
+    function debug(){
+      debugMode = true;
+    }
+
+    function isDebug(){
+      return debugMode;
+    }
+    
+    return {
+      setPath: path,
+      setVersionId: versionId,
+      debug: debug,
+      isDebug: isDebug
+    }
+  }();
+
+  return {
+    config: userCfg,
+    bootConfig: bootCfg,
+    boot: boot,
+    resource: resource,
+    kernel: kernel
+  }
+}();
        
 //
 // DOMContentLoaded used instead of window.onload event

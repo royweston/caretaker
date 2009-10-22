@@ -6,7 +6,7 @@
  * Licenced under the MIT licence.
  * http://royweston.me.uk/web-development/caretaker-javascript-library/licence
  *
- * Date: 2009-10-15
+ * Date: 2009-10-22
  */
 if (!window.Node) {
   var Node = {
@@ -94,7 +94,7 @@ ct.resource = function(){
         function() {
           req.abort();
           req.onreadystatechange = null;
-          (!ct.config.kernel_debug) ? null : alert('Request aborted: '+ url);
+          (ct.kernel.isDebug()) ? alert('Request aborted: '+ url) : null;
         }
       , TIMEOUT
       );
@@ -150,8 +150,8 @@ ct.resource = function(){
         // If the sameOriginDomain has been set to override the automated
         // relaxation of the the same-origin policy domain, then it should
         // be used.
-        if (ct.config.sameOriginDomain) {
-          document.domain = ct.config.sameOriginDomain;
+        if ('' !== ct.bootCfg.getSameOriginDomain()) {
+          document.domain = ct.bootCfg.getSameOriginDomain();
           return;
         }
         
@@ -583,11 +583,11 @@ ct.resource = function(){
   }
 }();
 
-if (ct.config && ct.config.cssResources){
-  ct.resource.loadCSS(ct.config.cssResources);    
+if (ct.bootConfig && (0 !== ct.bootConfig.cssResources().length)){
+  ct.resource.loadCSS(ct.bootConfig.cssResources());
 };
     
-if (ct.config && ct.config.jsResources){
-  ct.resource.loadJS(ct.config.jsResources);    
+if (ct.bootConfig && (0 !== ct.bootConfig.jsResources().length)){
+  ct.resource.loadJS(ct.bootConfig.jsResources());
 };
     
